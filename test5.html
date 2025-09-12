@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Analysis System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="#">
+                    <i class="fas fa-chart-line me-2"></i>Log Analysis System
+                </a>
+                <div class="navbar-nav ms-auto" id="nav-links">
+                    <a class="nav-link" href="#" id="history-link"><i class="fas fa-clock me-1"></i>Log History</a>
+                    <a class="nav-link" href="#" id="login-link">Login</a>
+                    <a class="nav-link" href="#" id="signup-link">Sign Up</a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="container mt-4">
+            <!-- Login Form -->
+            <div id="login-section" class="auth-section">
+                <div class="row justify-content-center">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="text-center">Login</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="login-form">
+                                    <div class="mb-3">
+                                        <label for="login-userid" class="form-label">User ID</label>
+                                        <input type="text" class="form-control" id="login-userid" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="login-password" class="form-label">Password</label>
+                                        <input type="password" class="form-control" id="login-password" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">Login</button>
+                                </form>
+                                <div class="text-center mt-3">
+                                    <a href="#" id="show-signup">Don't have an account? Sign up</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signup Form -->
+            <div id="signup-section" class="auth-section" style="display: none;">
+                <div class="row justify-content-center">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="text-center">Sign Up</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="signup-form">
+                                    <div class="mb-3">
+                                        <label for="signup-userid" class="form-label">User ID</label>
+                                        <input type="text" class="form-control" id="signup-userid" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="signup-password" class="form-label">Password</label>
+                                        <input type="password" class="form-control" id="signup-password" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="signup-teamid" class="form-label">Team ID</label>
+                                        <input type="text" class="form-control" id="signup-teamid" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100">Sign Up</button>
+                                </form>
+                                <div class="text-center mt-3">
+                                    <a href="#" id="show-login">Already have an account? Login</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard -->
+            <div id="dashboard-section" style="display: none;">
+                <!-- Profile Section -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h4><i class="fas fa-user me-2"></i>Profile</h4>
+                                <button class="btn btn-outline-primary" id="edit-profile-btn">Edit Profile</button>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>User ID:</strong> <span id="profile-userid"></span></p>
+                                        <p><strong>Team ID:</strong> <span id="profile-teamid"></span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong>Status:</strong> <span class="badge bg-success">Active</span></p>
+                                        <p><strong>Last Login:</strong> <span id="profile-last-login"></span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Log Upload Section -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4><i class="fas fa-upload me-2"></i>Upload Log File</h4>
+                            </div>
+                            <div class="card-body">
+                                <form id="upload-form" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <label for="log-file" class="form-label">Select Log File</label>
+                                        <input type="file" class="form-control" id="log-file" accept=".log,.txt" required>
+                                        <div class="form-text">Supported formats: .log, .txt (Max 100MB)</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="log-context" class="form-label">Context (Optional)</label>
+                                        <textarea class="form-control" id="log-context" rows="3" placeholder="Provide additional context about the log file..."></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-upload me-2"></i>Upload and Process
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Processing Status -->
+                <div id="processing-status" class="row mb-4" style="display: none;">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4><i class="fas fa-cog fa-spin me-2"></i>Processing Status</h4>
+                            </div>
+                            <div class="card-body">
+                                <div class="progress mb-3">
+                                    <div class="progress-bar" id="progress-bar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <p id="processing-message">Processing your log file...</p>
+                                <div id="processing-details"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Records Section -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h4><i class="fas fa-list me-2"></i>Log Records</h4>
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-outline-primary active" data-visibility="all">All</button>
+                                    <button class="btn btn-outline-primary" data-visibility="mine">Mine</button>
+                                    <button class="btn btn-outline-primary" data-visibility="team">Team</button>
+                                    <button class="btn btn-outline-primary" data-visibility="public">Public</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div id="records-list">
+                                    <div class="text-center">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading records...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conversations Section -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4><i class="fas fa-comments me-2"></i>Recent Conversations</h4>
+                            </div>
+                            <div class="card-body">
+                                <div id="conversations-list">
+                                    <div class="text-center">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading conversations...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Record Detail Modal -->
+            <div class="modal fade" id="record-modal" tabindex="-1">
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="record-modal-title">Record Details</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="record-details"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-primary" id="analyze-btn">Analyze with GenAPI</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Modal -->
+            <div class="modal fade" id="analysis-modal" tabindex="-1">
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Log Analysis Results</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="analysis-results"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                                <i class="fas fa-check me-2"></i>Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Question Modal -->
+            <div class="modal fade" id="question-modal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Ask a Question</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="question-input" class="form-label">Your Question</label>
+                                <textarea class="form-control" id="question-input" rows="3" placeholder="Ask a question about this log..."></textarea>
+                            </div>
+                            <div id="question-response" class="mt-3" style="display: none;">
+                                <div class="alert alert-info">
+                                    <h6>Response:</h6>
+                                    <p id="response-text"></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-primary" id="ask-question-btn">Ask Question</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log History Modal -->
+            <div class="modal fade" id="history-modal" tabindex="-1">
+                <div class="modal-dialog modal-fullscreen">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="fas fa-clock me-2"></i>Log History</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="card">
+                                        <div class="card-header"><strong>Filter by Tags</strong></div>
+                                        <div class="card-body" id="history-tags">
+                                            <div class="text-muted">Loading tags...</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover align-middle" id="history-table">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width:12rem">Log ID</th>
+                                                    <th style="width:8rem">Owner</th>
+                                                    <th style="width:12rem">Time</th>
+                                                    <th>Raw Log</th>
+                                                    <th style="width:22rem">Summary (GenAI)</th>
+                                                    <th style="width:14rem">Similarity (Top Match)</th>
+                                                    <th style="width:16rem">Tags</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr><td colspan="7" class="text-center text-muted py-4">Loading history...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Loading Modal -->
+            <div class="modal fade" id="analysis-loading-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-body text-center py-5">
+                            <div class="mb-4">
+                                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                            
+                            <h4 class="mb-3 text-primary">
+                                <i class="fas fa-brain me-2"></i>
+                                AI Analysis in Progress
+                            </h4>
+                            
+                            <p class="text-muted mb-4">
+                                Our AI is analyzing your log file to identify issues, patterns, and provide insights.
+                            </p>
+                            
+                            <!-- Progress Bar -->
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <small class="text-muted">Progress</small>
+                                    <small class="text-muted" id="progress-percentage">0%</small>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         id="progress-bar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Status Message -->
+                            <div class="mb-4">
+                                <p class="mb-2 fw-bold text-primary" id="analysis-status">Initializing analysis...</p>
+                                <small class="text-muted" id="elapsed-time" style="display: none;">
+                                    <i class="fas fa-clock me-1"></i>
+                                    Elapsed time: <span id="elapsed-time-text">0s</span>
+                                </small>
+                            </div>
+                            
+                            <!-- Analysis Steps -->
+                            <div class="row text-start">
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="fas fa-check-circle me-2 text-muted" id="step-1"></i>
+                                        <small>Connecting to AI</small>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="fas fa-check-circle me-2 text-muted" id="step-2"></i>
+                                        <small>Processing log content</small>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="fas fa-check-circle me-2 text-muted" id="step-3"></i>
+                                        <small>Analyzing patterns</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="fas fa-check-circle me-2 text-muted" id="step-4"></i>
+                                        <small>Generating insights</small>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="fas fa-check-circle me-2 text-muted" id="step-5"></i>
+                                        <small>Finalizing results</small>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="fas fa-check-circle me-2 text-muted" id="step-6"></i>
+                                        <small>Complete</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Tips -->
+                            <div class="mt-4 p-3 bg-light rounded">
+                                <small class="text-muted">
+                                    <i class="fas fa-lightbulb me-1"></i>
+                                    <strong>Tip:</strong> The AI is examining your log for errors, warnings, patterns, and potential issues to provide you with actionable insights.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

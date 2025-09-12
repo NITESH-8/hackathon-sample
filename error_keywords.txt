@@ -1,0 +1,124 @@
+# Error Keywords for Enhanced Detection
+# Format: keyword or phrase
+# Categories and severity are detected automatically
+
+# Critical Errors
+kernel panic
+segmentation fault
+SIGSEGV
+null pointer dereference
+core dumped
+fatal error
+critical error
+system halt
+machine check error
+
+# High Severity Errors
+out of memory
+OOM
+buffer overflow
+stack overflow
+deadlock detected
+hung task
+timeout
+connection refused
+permission denied
+access denied
+
+# Medium Severity Errors
+error
+failed
+exception
+crash
+abort
+halt
+corruption
+corrupted
+database error
+sql error
+network error
+socket error
+
+# Low Severity Errors
+warning
+warn
+alert
+notice
+info error
+debug error
+
+# Memory Errors
+memory leak
+leak detected
+use after free
+double free
+wild pointer
+dangling pointer
+memory corruption
+
+# Hardware Errors
+hardware failure
+thermal shutdown
+fan failure
+disk failure
+I/O error
+checksum error
+ECC error
+bad sector
+
+# Security Errors
+security violation
+unauthorized access
+intrusion detected
+malware detected
+buffer overflow attack
+SQL injection
+certificate error
+encryption error
+
+# Application Errors
+application crash
+process died
+process killed
+zombie process
+orphaned process
+resource leak
+handle leak
+thread leak
+mutex deadlock
+semaphore error
+ 
+# User requested additions
+warning
+warn
+error
+err
+crit
+alert
+panic
+emerg
+FATAL
+Critical
+Emergency
+POWERFAILED
+unable
+Out of memory
+Connection timeout
+Unable to reach
+Unable to detect
+internal error
+bad happened
+went wrong
+Login failed
+Invalid
+segmentation fault
+unaligned addresses
+divide by zero
+freeze
+Page fault
+Storage violation
+Undefined behavior
+Memory corruption
+invalid addresses
+alignment error
+crash

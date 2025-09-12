@@ -1,0 +1,11 @@
+[2024-01-15 10:30:15] INFO: Application started successfully
+[2024-01-15 10:30:16] DEBUG: Loading configuration from config.json
+[2024-01-15 10:30:17] INFO: Database connection established
+[2024-01-15 10:30:18] WARNING: Low memory usage detected: 45%
+[2024-01-15 10:30:19] ERROR: Failed to connect to external API: Connection timeout
+[2024-01-15 10:30:20] INFO: Retrying connection in 5 seconds...
+[2024-01-15 10:30:25] ERROR: Failed to connect to external API: Connection timeout
+[2024-01-15 10:30:26] CRITICAL: Service unavailable - shutting down
+[2024-01-15 10:30:27] INFO: Graceful shutdown initiated
+[2024-01-15 10:30:28] DEBUG: Cleaning up resources
+[2024-01-15 10:30:29] INFO: Application stopped
