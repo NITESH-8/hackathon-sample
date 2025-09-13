@@ -381,3 +381,44 @@ const UploadArea = ({ onUploadSuccess }) => {
 };
 
 export default UploadArea;
+
+
+
+
+/* Uploaded file preview styles */
+.uploaded-file-preview {
+  margin-bottom: 1rem;
+}
+
+.uploaded-file-preview .border {
+  border-color: #dee2e6 !important;
+  transition: all 0.3s ease;
+}
+
+.uploaded-file-preview .border:hover {
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.uploaded-file-preview .btn {
+  transition: all 0.3s ease;
+}
+
+.uploaded-file-preview .btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Loading spinner for submit button */
+.uploaded-file-preview .loading-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
