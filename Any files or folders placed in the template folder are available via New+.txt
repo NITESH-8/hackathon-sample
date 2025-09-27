@@ -4,6 +4,7 @@ import csv
 import os
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -562,6 +563,7 @@ class PerformanceApp(QtWidgets.QMainWindow):
 		self.btn_load_binary = QtWidgets.QToolButton()
 		self.btn_load_binary.setText("Load Binary")
 		self.btn_load_binary.setToolTip("Choose a binary to use with the test")
+		self.btn_load_binary.setObjectName("btn_load")
 		self.btn_load_binary.clicked.connect(self._on_load_binary)
 		toolbar.addWidget(self.btn_load_binary)
 		# Actions
@@ -580,6 +582,13 @@ class PerformanceApp(QtWidgets.QMainWindow):
 		# Collapse/expand handled by side handle; Reset View exists in plot header
 		for act in [a_start, a_stop, a_clear, a_sched, a_csv, a_png]:
 			toolbar.addAction(act)
+		# Tag important toolbar buttons for themed styling
+		btn_exec = toolbar.widgetForAction(a_start)
+		if isinstance(btn_exec, QtWidgets.QToolButton):
+			btn_exec.setObjectName("btn_execute")
+		btn_stop_w = toolbar.widgetForAction(a_stop)
+		if isinstance(btn_stop_w, QtWidgets.QToolButton):
+			btn_stop_w.setObjectName("btn_stop")
 
 		# Push the theme toggle to the extreme right
 		spacer = QtWidgets.QWidget()
@@ -592,7 +601,7 @@ class PerformanceApp(QtWidgets.QMainWindow):
 		# Remove text action toggle; handled by side handle now
 
 	def _on_load_binary(self) -> None:
-		"""Auto-run UART workflow to load binary without file selection."""
+		"""Auto-run UART workflow using a separate hidden serial session."""
 		try:
 			# Update tooltip to indicate automated flow
 			if hasattr(self, 'btn_load_binary'):
@@ -600,38 +609,113 @@ class PerformanceApp(QtWidgets.QMainWindow):
 			# Run only for Yocto/Ubuntu
 			os_sel = getattr(self, 'selected_target_os', None) or (self.combo_target_os.currentText() if hasattr(self, 'combo_target_os') else "")
 			if os_sel not in ("Yocto", "Ubuntu"):
-				QtWidgets.QMessageBox.information(self, "Not Supported", "Load Binary is supported for Yocto or Ubuntu only.")
+				self._show_info_dialog("Not Supported", "Load Binary is supported for Yocto or Ubuntu only.")
 				return
-			if not hasattr(self, 'comm_console'):
-				return
-			cc = self.comm_console
-			# Refresh and locate Linux UART by VID:PID pattern
-			cc.refresh_ports()
-			linux_port = cc.find_linux_port()
-			if not linux_port:
-				QtWidgets.QMessageBox.critical(self, "Linux UART Not Found", "Couldn't locate a COM port with VID:PID=067B:23A3.")
-				return
-			# Try to connect at 115200. If busy or fails, show a warning.
-			if not cc.connect_to_port(linux_port, 115200):
-				QtWidgets.QMessageBox.warning(self, "Port Busy", f"Failed to open {linux_port}. It may be in use by another application.")
-				return
-			# Send command sequence to prepare Linux side, then disconnect
-			# Use absolute paths and robust flags; give the target time to react.
-			commands = [
-				"",                             # newline to wake console
-				"cd /",                         # go to filesystem root
-				"mkdir -p /stress_tool",        # create mountpoint if missing
-				"mount /dev/usb1 /stress_tool", # mount USB device at mountpoint
-				"cp -r /mnt/usb/stress_tool /stress_tool",  # copy folder recursively
-			]
-			def _on_loaded():
-				try:
-					cc.disconnect_serial()
-				finally:
-					QtWidgets.QMessageBox.information(self, "Binary Loaded", "Binary loaded successfully.")
-			cc.send_commands(commands, spacing_ms=1000, on_complete=_on_loaded)
+			self._auto_load_binary_over_uart()
 		except Exception:
 			pass
+
+	def _auto_load_binary_over_uart(self) -> None:
+		"""Find Linux UART by VID:PID and send commands without touching Access UART."""
+		try:
+			from serial.tools import list_ports
+			import serial
+		except Exception:
+			self._show_error_dialog("Serial Module Missing", "pyserial is not installed. Install it with:\n\n  python -m pip install pyserial")
+			return
+		# Locate matching ports by VID:PID
+		needle = "VID:PID=067B:23A3"
+		candidates = []
+		try:
+			for p in list_ports.comports():
+				hwid = getattr(p, 'hwid', '') or ''
+				if needle in hwid:
+					candidates.append(p.device)
+		except Exception:
+			pass
+		if not candidates:
+			self._show_error_dialog("Linux UART Not Found", f"Couldn't locate a COM port with {needle}.")
+			return
+		# Choose lowest COM number
+		def _com_num(name: str) -> int:
+			m = re.search(r"COM(\d+)$", name.upper())
+			return int(m.group(1)) if m else 1_000_000
+		candidates.sort(key=_com_num)
+		port = candidates[0]
+		# Try open at 115200; handle busy/denied
+		ser = None
+		try:
+			ser = serial.Serial(port=port, baudrate=115200, timeout=1, write_timeout=3)
+		except Exception as e:
+			msg = str(e)
+			if isinstance(e, PermissionError) or "denied" in msg.lower() or "busy" in msg.lower():
+				self._show_warning_dialog("Port Busy", f"Failed to open {port}. It may be in use by another application.\n\nDetails: {msg}")
+			else:
+				self._show_error_dialog("Open Port Failed", msg)
+			return
+		try:
+			# Commands with pauses (absolute paths)
+			cmds = [
+				"",                             # wake console
+				"cd /",
+				"mkdir -p /stress_tool",
+				"mount /dev/usb1 /stress_tool",
+				"cp -r /mnt/usb/stress_tool /stress_tool",
+			]
+			for cmd in cmds:
+				try:
+					ser.write((cmd + "\n").encode())
+					time.sleep(1.0)
+				except Exception:
+					break
+		finally:
+			try:
+				if ser is not None:
+					ser.close()
+			except Exception:
+				pass
+		self._show_info_dialog("Binary Loaded", f"Binary loaded successfully over {port}.")
+
+	def _msgbox_style(self, accent_hex: str) -> str:
+		"""Return a stylesheet for QColor-accented message boxes respecting theme."""
+		is_dark = getattr(self, '_is_dark', True)
+		bg = '#14171C' if is_dark else '#FFFFFF'
+		border = '#2A2F36' if is_dark else '#E5E7EB'
+		text = '#E8ECEF' if is_dark else '#0B1220'
+		btn_bg = '#1D2228' if is_dark else '#FFFFFF'
+		btn_border = '#2D333B' if is_dark else '#E5E7EB'
+		btn_hover = '#242A32' if is_dark else '#F3F4F6'
+		btn_text = '#E8ECEF' if is_dark else '#0F172A'
+		return (
+			f"QMessageBox {{ background: {bg}; border: 1px solid {border}; border-left: 6px solid {accent_hex}; }}"
+			f"QMessageBox QLabel {{ color: {text}; }}"
+			f"QMessageBox QPushButton {{ background: {btn_bg}; border: 1px solid {btn_border}; border-radius: 6px; padding: 6px 12px; color: {btn_text}; }}"
+			f"QMessageBox QPushButton:hover {{ background: {btn_hover}; }}"
+		)
+
+	def _show_info_dialog(self, title: str, text: str) -> None:
+		msg = QtWidgets.QMessageBox(self)
+		msg.setIcon(QtWidgets.QMessageBox.Information)
+		msg.setWindowTitle(title)
+		msg.setText(text)
+		msg.setStyleSheet(self._msgbox_style('#10B981'))  # emerald
+		msg.exec()
+
+	def _show_warning_dialog(self, title: str, text: str) -> None:
+		msg = QtWidgets.QMessageBox(self)
+		msg.setIcon(QtWidgets.QMessageBox.Warning)
+		msg.setWindowTitle(title)
+		msg.setText(text)
+		msg.setStyleSheet(self._msgbox_style('#F59E0B'))  # amber
+		msg.exec()
+
+	def _show_error_dialog(self, title: str, text: str) -> None:
+		msg = QtWidgets.QMessageBox(self)
+		msg.setIcon(QtWidgets.QMessageBox.Critical)
+		msg.setWindowTitle(title)
+		msg.setText(text)
+		msg.setStyleSheet(self._msgbox_style('#EF4444'))  # red
+		msg.exec()
 	def _apply_dark_theme(self) -> None:
 		"""Apply a subtle dark theme and modern widget styling."""
 		pal = self.palette()
@@ -661,6 +745,13 @@ class PerformanceApp(QtWidgets.QMainWindow):
 			QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; color: #A0AEC0; }
 			QPushButton, QToolButton { background: #1D2228; border: 1px solid #2D333B; border-radius: 6px; padding: 6px 10px; }
 			QPushButton:hover, QToolButton:hover { background: #242A32; }
+			/* Semantic toolbar buttons (subtle tones) */
+			#btn_execute { background: #1A2A1F; border-color: #24402B; color: #D7F5E1; }
+			#btn_execute:hover { background: #20402A; }
+			#btn_load { background: #1A2A1F; border-color: #24402B; color: #D7F5E1; }
+			#btn_load:hover { background: #20402A; }
+			#btn_stop { background: #2A1A1A; border-color: #402424; color: #F5D7D7; }
+			#btn_stop:hover { background: #401F1F; }
 			QPushButton:disabled { color: #7D8896; }
 			QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {
 				background: #1E2329; border: 1px solid #323842; border-radius: 6px; padding: 6px 8px; color: #E8ECEF;
@@ -668,6 +759,11 @@ class PerformanceApp(QtWidgets.QMainWindow):
 			QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
 				border-color: #3B82F6;
 			}
+			/* Message boxes - make text and buttons clearly visible */
+			QMessageBox { background: #14171C; border: 1px solid #2A2F36; }
+			QMessageBox QLabel { color: #E8ECEF; }
+			QMessageBox QPushButton { background: #1D2228; border: 1px solid #2D333B; border-radius: 6px; padding: 6px 12px; color: #E8ECEF; }
+			QMessageBox QPushButton:hover { background: #242A32; }
 			#userGroup { border: 1px solid #2A2F36; }
 			#commandPreview { background: #14171C; border-radius: 6px; }
 			QSlider::groove:horizontal { height: 6px; background: #2A2F36; border-radius: 3px; }
@@ -715,6 +811,13 @@ class PerformanceApp(QtWidgets.QMainWindow):
 			QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 1px 8px; color: #374151; }
 			QPushButton, QToolButton { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 6px 10px; }
 			QPushButton:hover, QToolButton:hover { background: #F3F4F6; border-color: #D1D5DB; }
+			/* Semantic toolbar buttons (subtle tones) */
+			#btn_execute { background: #EBF7EE; border-color: #BFE3C8; color: #14532D; }
+			#btn_execute:hover { background: #DDF0E3; }
+			#btn_load { background: #EBF7EE; border-color: #BFE3C8; color: #14532D; }
+			#btn_load:hover { background: #DDF0E3; }
+			#btn_stop { background: #FBEAEA; border-color: #F0C2C2; color: #7F1D1D; }
+			#btn_stop:hover { background: #F6DDDD; }
 			QPushButton:disabled { color: #94A3B8; }
 			QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {
 				background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 5px 8px; color: #0F172A;
@@ -722,6 +825,11 @@ class PerformanceApp(QtWidgets.QMainWindow):
 			QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
 				border-color: #3B82F6;
 			}
+			/* Message boxes - make text and buttons clearly visible */
+			QMessageBox { background: #FFFFFF; border: 1px solid #E5E7EB; }
+			QMessageBox QLabel { color: #0B1220; }
+			QMessageBox QPushButton { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 6px 12px; color: #0F172A; }
+			QMessageBox QPushButton:hover { background: #F3F4F6; border-color: #D1D5DB; }
 			#userGroup { border: 1px solid #E5E7EB; }
 			#commandPreview { background: #FFFFFF; border-radius: 8px; }
 			QSlider::groove:horizontal { height: 6px; background: #E5E7EB; border-radius: 3px; }
