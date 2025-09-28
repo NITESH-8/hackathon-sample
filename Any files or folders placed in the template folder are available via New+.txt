@@ -381,8 +381,18 @@ class CommConsole(QtWidgets.QWidget):
 					self._rx_rem = ""
 					# Remove bracketed paste/line-edit markers often seen: [?2004h / [?2004l
 					import re
-					text = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]", "", text)  # ANSI CSI sequences
+					# Remove CSI and OSC sequences
+					text = re.sub(r"\x1b\[[0-9;?]*[ -/]*[@-~]", "", text)  # CSI
+					text = re.sub(r"\x1b\].*?\x07", "", text)  # OSC
 					text = text.replace("[?2004h", "").replace("[?2004l", "")
+					# Collapse excessive blank lines
+					lines2 = [l for l in text.split("\n")]
+					collapsed: List[str] = []
+					for l in lines2:
+						if l.strip() == "" and (not collapsed or collapsed[-1].strip() == ""):
+							continue
+						collapsed.append(l)
+					text = "\n".join(collapsed)
 					# If device echoes the command, drop the echoed line
 					if self._last_sent:
 						lines = text.split("\n")
@@ -425,13 +435,19 @@ class CommConsole(QtWidgets.QWidget):
 			if self._serial is not None:
 				self._last_sent = msg
 				self._serial.write((msg + "\n").encode())
-				# Echo into per-port log and keep caret at end
+				# Inline the command next to the existing prompt instead of echoing on a new line
 				port = self.uart_port_combo.currentText()
-				# Do not echo the command text itself; only move to next line
-				self._port_logs[port] = self._port_logs.get(port, "")
+				cur_text = self._port_logs.get(port, "")
+				# Ensure the command appears on the same line as the latest prompt
+				if cur_text.endswith("\n"):
+					# no visible prompt on the current line; keep as is
+					append_txt = msg
+				else:
+					append_txt = " " + msg
+				self._port_logs[port] = cur_text + append_txt
 				if hasattr(self, 'log'):
 					self.log.moveCursor(QtGui.QTextCursor.End)
-					# don't insert the command itself; the device may echo it
+					self.log.insertPlainText(append_txt)
 					self.log.moveCursor(QtGui.QTextCursor.End)
 				if hasattr(self, 'input'):
 					self.input.clear()
