@@ -156,6 +156,7 @@ class CommConsole(QtWidgets.QWidget):
 		# Track last command to suppress device echo; RX remainder for partial lines
 		self._last_sent = ""
 		self._rx_rem = ""
+		self._last_prompt = ""
 
 	def _on_proto_changed(self) -> None:
 		idx = self.proto_combo.currentIndex()
@@ -398,6 +399,7 @@ class CommConsole(QtWidgets.QWidget):
 						filtered: List[str] = []
 						for ln in lines:
 							ln_clean = ln.strip("\r\n ")
+							# Allow prompt-only lines; drop echoed command lines
 							if ln_clean == self._last_sent or ln_clean.endswith(" " + self._last_sent) or ln_clean.endswith("#" + self._last_sent) or ln_clean.endswith(":" + self._last_sent):
 								continue
 							filtered.append(ln)
@@ -414,6 +416,15 @@ class CommConsole(QtWidgets.QWidget):
 							if not self._is_prompt_like(text):
 								self._rx_rem = text
 								text = ""
+					# Normalize trailing prompt to include a single space for readability
+					if text:
+						parts = text.split("\n")
+						if parts:
+							last_line = parts[-1].rstrip(" \t\r")
+							if self._is_prompt_like(last_line):
+								self._last_prompt = last_line + ("" if last_line.endswith(" ") else " ")
+								parts[-1] = self._last_prompt
+							text = "\n".join(parts)
 					# Append to per-port log buffer and UI
 					if text:
 						port = self.uart_port_combo.currentText()
