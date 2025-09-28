@@ -153,6 +153,9 @@ class CommConsole(QtWidgets.QWidget):
 		self.refresh_ports()
 		# Default SOC USB identifier (Windows hwid format substring)
 		self._soc_port_id = "VID:PID=067B:23A3"
+		# Track last command to suppress device echo; RX remainder for partial lines
+		self._last_sent = ""
+		self._rx_rem = ""
 
 	def _on_proto_changed(self) -> None:
 		idx = self.proto_combo.currentIndex()
@@ -370,16 +373,39 @@ class CommConsole(QtWidgets.QWidget):
 				data = self._serial.read(self._serial.in_waiting)
 				if data:
 					try:
-						text = data.decode(errors="replace")
+						chunk = data.decode(errors="replace")
 					except Exception:
-						text = str(data)
+						chunk = str(data)
+					# Strip common terminal control sequences and suppress local echo of last command
+					text = self._rx_rem + chunk
+					self._rx_rem = ""
+					# Remove bracketed paste/line-edit markers often seen: [?2004h / [?2004l
+					import re
+					text = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]", "", text)  # ANSI CSI sequences
+					text = text.replace("[?2004h", "").replace("[?2004l", "")
+					# If device echoes the command, drop the echoed line
+					if self._last_sent:
+						lines = text.split("\n")
+						filtered: List[str] = []
+						for ln in lines:
+							# Trim carriage returns
+							ln_stripped = ln.rstrip("\r")
+							if ln_stripped == self._last_sent:
+								continue
+							filtered.append(ln)
+						text = "\n".join(filtered)
+					# If the last chunk ends mid-line, keep remainder for next poll
+					if not chunk.endswith("\n") and "\n" in text:
+						self._rx_rem = text.split("\n")[-1]
+						text = "\n".join(text.split("\n")[:-1])
 					# Append to per-port log buffer and UI
-					port = self.uart_port_combo.currentText()
-					self._port_logs[port] = self._port_logs.get(port, "") + text
-					if hasattr(self, 'log'):
-						self.log.moveCursor(QtGui.QTextCursor.End)
-						self.log.insertPlainText(text)
-						self.log.moveCursor(QtGui.QTextCursor.End)
+					if text:
+						port = self.uart_port_combo.currentText()
+						self._port_logs[port] = self._port_logs.get(port, "") + text
+						if hasattr(self, 'log'):
+							self.log.moveCursor(QtGui.QTextCursor.End)
+							self.log.insertPlainText(text)
+							self.log.moveCursor(QtGui.QTextCursor.End)
 		except Exception as e:
 			self._poll.stop()
 			try:
@@ -397,13 +423,15 @@ class CommConsole(QtWidgets.QWidget):
 			return
 		try:
 			if self._serial is not None:
+				self._last_sent = msg
 				self._serial.write((msg + "\n").encode())
 				# Echo into per-port log and keep caret at end
 				port = self.uart_port_combo.currentText()
-				self._port_logs[port] = self._port_logs.get(port, "") + msg + "\n"
+				# Do not echo the command text itself; only move to next line
+				self._port_logs[port] = self._port_logs.get(port, "")
 				if hasattr(self, 'log'):
 					self.log.moveCursor(QtGui.QTextCursor.End)
-					self.log.insertPlainText("\n")
+					# don't insert the command itself; the device may echo it
 					self.log.moveCursor(QtGui.QTextCursor.End)
 				if hasattr(self, 'input'):
 					self.input.clear()
