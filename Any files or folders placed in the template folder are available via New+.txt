@@ -13,8 +13,7 @@ class CommConsole(QtWidgets.QWidget):
 	- Settings: Baud, Data bits, Parity, Stop bits, Flow control
 	- Connect/Disconnect toggle
 	- Large read-only log and a compact multi-line input box
-	- Enter sends Enter (LF) over UART and inserts literal "\\n" in the input
-	- Shift+Enter inserts an actual newline in the input box
+	- Enter to send (LF), Shift+Enter for newline
 
 	Designed to be extended later for SSH / ADB by adding pages to
 	`self.proto_stack` while keeping the same log/input area.
@@ -137,7 +136,7 @@ class CommConsole(QtWidgets.QWidget):
 		v.addWidget(self.log, 1)
 
 		self.input = QtWidgets.QPlainTextEdit()
-		self.input.setPlaceholderText("Press Enter to send ENTER (\\n) and insert \\\"\\n\\\" here. Shift+Enter inserts a new line.")
+		self.input.setPlaceholderText("Type and press Enter to send. Shift+Enter for newline.")
 		self.input.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
 		self.input.setFixedHeight(60)
 		self.input.installEventFilter(self)
@@ -420,21 +419,24 @@ class CommConsole(QtWidgets.QWidget):
 						self.input.insertPlainText("\n")
 						return True
 					else:
-						# Send an ENTER (LF) over UART and insert literal "\\n" in the input box
+						# If current line has content, send it; otherwise send a bare ENTER to wake the console
 						try:
-							if self._serial is not None:
-								self._serial.write(b"\n")
-								# Echo newline into log for coherence
-								port = self.uart_port_combo.currentText()
-								self._port_logs[port] = self._port_logs.get(port, "") + "\n"
-								if hasattr(self, 'log'):
-									self.log.moveCursor(QtGui.QTextCursor.End)
-									self.log.insertPlainText("\n")
-									self.log.moveCursor(QtGui.QTextCursor.End)
+							current_line = self.input.textCursor().block().text()
+							if current_line.strip():
+								self._on_send()
+							else:
+								if self._serial is not None:
+									self._serial.write(b"\n")
+									# Echo newline into log for coherence
+									port = self.uart_port_combo.currentText()
+									self._port_logs[port] = self._port_logs.get(port, "") + "\n"
+									if hasattr(self, 'log'):
+										self.log.moveCursor(QtGui.QTextCursor.End)
+										self.log.insertPlainText("\n")
+										self.log.moveCursor(QtGui.QTextCursor.End)
 						except Exception:
 							pass
-						# Show literal characters in input so user sees that ENTER was sent
-						self.input.insertPlainText("\\n")
+						# Always consume Enter so it doesn't modify the input box
 						return True
 		except Exception:
 			pass
