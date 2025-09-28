@@ -384,12 +384,11 @@ class CommConsole(QtWidgets.QWidget):
 					# Remove CSI and OSC sequences
 					text = re.sub(r"\x1b\[[0-9;?]*[ -/]*[@-~]", "", text)  # CSI
 					text = re.sub(r"\x1b\].*?\x07", "", text)  # OSC
-					text = text.replace("[?2004h", "").replace("[?2004l", "")
-					# Collapse excessive blank lines
-					lines2 = [l for l in text.split("\n")]
+					# Collapse excessive blank lines and trim trailing spaces
+					lines2 = [l.rstrip(" \t\r") for l in text.split("\n")]
 					collapsed: List[str] = []
 					for l in lines2:
-						if l.strip() == "" and (not collapsed or collapsed[-1].strip() == ""):
+						if l == "" and (not collapsed or collapsed[-1] == ""):
 							continue
 						collapsed.append(l)
 					text = "\n".join(collapsed)
