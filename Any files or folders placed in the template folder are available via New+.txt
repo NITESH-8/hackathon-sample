@@ -402,14 +402,18 @@ class CommConsole(QtWidgets.QWidget):
 								continue
 							filtered.append(ln)
 						text = "\n".join(filtered)
-					# If the last chunk ends mid-line, keep remainder for next poll
+					# If the last chunk ends mid-line, keep remainder for next poll unless it looks like a prompt
 					if not text.endswith("\n"):
 						if "\n" in text:
-							self._rx_rem = text.split("\n")[-1]
-							text = "\n".join(text.split("\n")[:-1])
+							last_frag = text.split("\n")[-1]
+							if not self._is_prompt_like(last_frag):
+								self._rx_rem = last_frag
+								text = "\n".join(text.split("\n")[:-1])
+							# else: keep prompt fragment visible now
 						else:
-							self._rx_rem = text
-							text = ""
+							if not self._is_prompt_like(text):
+								self._rx_rem = text
+								text = ""
 					# Append to per-port log buffer and UI
 					if text:
 						port = self.uart_port_combo.currentText()
@@ -461,6 +465,7 @@ class CommConsole(QtWidgets.QWidget):
 								if self._serial is not None:
 									# Send bare LF to device to wake; do not add any local newline to the log
 									self._serial.write(b"\n")
+									# If we detect an immediate prompt in next poll, it will show automatically
 						except Exception:
 							pass
 						# Always consume Enter so it doesn't modify the input box
@@ -468,5 +473,17 @@ class CommConsole(QtWidgets.QWidget):
 		except Exception:
 			pass
 		return super().eventFilter(source, event)
+
+	def _is_prompt_like(self, s: str) -> bool:
+		"""Heuristic: detect shell prompt-like fragments to keep them visible.
+
+		Examples: 'root@host:/#', 'user@host:~$', '/ #', '#', '$'
+		"""
+		s = (s or "").strip()
+		if not s:
+			return False
+		if s.endswith(('#', '$', '>')) and (':' in s or '/' in s or '~' in s or s in ('#', '$', '>')):
+			return True
+		return False
 
 
