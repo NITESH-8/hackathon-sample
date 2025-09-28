@@ -452,7 +452,29 @@ class CommConsole(QtWidgets.QWidget):
 			if self._serial is not None:
 				self._last_sent = msg
 				self._serial.write((msg + "\n").encode())
-				# Do NOT append anything locally; rely on device output to show prompt/echo
+				# Show "prompt + input" inline like Tera Term, without waiting for device echo
+				port = self.uart_port_combo.currentText()
+				cur_text = self._port_logs.get(port, "")
+				# Identify current last line and whether it looks like a prompt
+				last_line = (cur_text.split("\n")[-1] if cur_text else "")
+				append_line = ""
+				if last_line and self._is_prompt_like(last_line):
+					# Ensure a single trailing space before the command
+					prefix = last_line + ("" if last_line.endswith(" ") else " ")
+					# Replace last line with prompt+command
+					cur_text = "\n".join(cur_text.split("\n")[:-1]) + ("\n" if "\n" in cur_text else "")
+					append_line = prefix + msg
+				elif self._last_prompt and cur_text.endswith("\n"):
+					# We remember the last prompt; re-emit it with the command
+					append_line = self._last_prompt + msg
+				else:
+					# Fallback: just show the command on the current line
+					append_line = ("" if (cur_text.endswith(" ") or cur_text.endswith("\n") or not cur_text) else " ") + msg
+				self._port_logs[port] = cur_text + append_line
+				if hasattr(self, 'log'):
+					self.log.moveCursor(QtGui.QTextCursor.End)
+					self.log.insertPlainText(append_line)
+					self.log.moveCursor(QtGui.QTextCursor.End)
 				if hasattr(self, 'input'):
 					self.input.clear()
 		except Exception as e:
