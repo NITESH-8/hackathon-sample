@@ -164,7 +164,8 @@ class PerformanceApp(QtWidgets.QMainWindow):
 
 	def _init_cpu_cores(self) -> None:
 		"""Initialize CPU core states."""
-		self.core_count = int(get_cpu_core_count())
+		# Default to 7 cores until Linux reports actual core count
+		self.core_count = 7
 		self.core_states = {i: CoreState(core_id=i) for i in range(self.core_count)}
 
 	def _build_ui(self) -> None:
@@ -669,13 +670,8 @@ class PerformanceApp(QtWidgets.QMainWindow):
 		"""Recreate CPU cores UI based on self.core_count."""
 		if not hasattr(self, 'cores_layout'):
 			return
-		# Remove existing core rows
-		for i in reversed(range(self.cores_layout.count())):
-			item = self.cores_layout.itemAt(i)
-			w = item.widget()
-			if w is not None:
-				self.cores_layout.removeWidget(w)
-				w.deleteLater()
+		# Remove all existing items (widgets and sub-layouts) to avoid duplicates
+		self._clear_layout(self.cores_layout)
 		# Reset data structures
 		self.core_checkboxes.clear()
 		self.core_sliders.clear()
@@ -745,6 +741,22 @@ class PerformanceApp(QtWidgets.QMainWindow):
 			core_row.addStretch(1)
 			self.cores_layout.addWidget(row_container)
 			self.core_row_widgets[core_id] = row_container
+
+	def _clear_layout(self, layout: QtWidgets.QLayout) -> None:
+		"""Recursively remove all items (widgets and sub-layouts) from a layout."""
+		try:
+			while layout.count():
+				item = layout.takeAt(0)
+				if item is None:
+					continue
+				child_widget = item.widget()
+				child_layout = item.layout()
+				if child_widget is not None:
+					child_widget.deleteLater()
+				elif child_layout is not None:
+					self._clear_layout(child_layout)
+		except Exception:
+			pass
 
 	def _auto_load_binary_over_uart(self) -> None:
 		"""Find Linux UART by VID:PID and send commands without touching Access UART."""
