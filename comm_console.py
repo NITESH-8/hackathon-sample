@@ -419,6 +419,9 @@ class CommConsole(QtWidgets.QWidget):
 					else:
 						self._on_send()
 						return True
+		except KeyboardInterrupt:
+			# Ignore Ctrl+C interrupts when running from a console to avoid PySide error dialog
+			return False
 		except Exception:
 			pass
 		return super().eventFilter(source, event)
