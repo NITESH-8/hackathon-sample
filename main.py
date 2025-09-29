@@ -787,14 +787,18 @@ class PerformanceApp(QtWidgets.QMainWindow):
 		try:
 			# Commands with pauses (as requested)
 			cmds = [
-				"",               # wake console
 				"sudo su",
 				"nvidia",
 				"cd /",
 				"mkdir -p /mnt/usb",
-				"mkdir -p /stress_tool",
-				"mount /dev/usb/stress_tool /stress_tool",
-				"unmount /mnt/usb",
+				"mkdir -p /stress_tools",
+				"DEV=\"$(lsblk -rpno NAME,TYPE,TRAN | awk '$2==\"disk\" && $3==\"usb\"{print $1; exit}')\"",
+				"if [ -z \"$DEV\" ]; then DEV=\"$(lsblk -rpno NAME,TYPE,RM | awk '$2==\"disk\" && $3==\"1\"{print $1; exit}')\"; fi",
+				"PART=\"$(lsblk -rpno NAME,TYPE \"$DEV\" | awk '$2==\"part\"{print $1; exit}')\"",
+				"if [ -z \"$PART\" ]; then PART=\"$(lsblk -rpno NAME,TYPE | awk '$2==\"part\"{print $1; exit}')\"; fi",
+				"mount \"$PART\" /mnt/usb || (sleep 1; mount \"$PART\" /mnt/usb)",
+				"cp /mnt/usb/stress_tool /stress_tools/",
+				"umount /mnt/usb",
 				"cd /",
 			]
 			for cmd in cmds:
@@ -1366,10 +1370,55 @@ class PerformanceApp(QtWidgets.QMainWindow):
 		self.is_running = True
 		duration_s = int(self.duration_spin.value())
 		self.end_time_epoch = get_timestamp() + duration_s
-		# Start external command if provided
-		cmd = self.command_preview.toPlainText().strip()
-		if cmd:
-			self._start_process(cmd)
+		# Ensure command preview reflects current selections
+		self._update_command_preview()
+		# Execute over UART on the Linux COM port (VID:PID=067B:23A3)
+		linux_port = None
+		try:
+			linux_port = self.comm_console.find_linux_port("VID:PID=067B:23A3")
+		except Exception:
+			linux_port = None
+		if not linux_port:
+			QtWidgets.QMessageBox.critical(self, "Linux UART Not Found", "Couldn't locate a COM port with VID:PID=067B:23A3.")
+			self._on_stop()
+			return
+		# If connected to a different port, disconnect first
+		try:
+			current_connected = bool(self.comm_console.uart_connect_btn.isChecked())
+			different_port = (getattr(self.comm_console, '_current_port', '') or '') != linux_port
+			if current_connected and different_port:
+				self.comm_console._uart_disconnect_if_needed()
+		except Exception:
+			pass
+		# Connect to the Linux port at 115200 if not already
+		connected = False
+		try:
+			if not self.comm_console.uart_connect_btn.isChecked() or (getattr(self.comm_console, '_current_port', '') or '') != linux_port:
+				connected = self.comm_console.connect_to_port(linux_port, baud=115200)
+			else:
+				connected = True
+		except Exception:
+			connected = False
+		if not connected:
+			QtWidgets.QMessageBox.critical(self, "UART Connect Failed", f"Failed to open {linux_port} at 115200.")
+			self._on_stop()
+			return
+		# Show UART console to visualize interaction
+		try:
+			self.btn_uart_toggle.setChecked(True)
+			self.main_stack.setCurrentIndex(1)
+		except Exception:
+			pass
+		# Build and send commands: cd /; cd stress_tools; run generated command
+		cmd_line = self.command_preview.toPlainText().strip()
+		if not cmd_line:
+			QtWidgets.QMessageBox.warning(self, "No Command", "Generated command is empty.")
+		else:
+			self.comm_console.send_commands([
+				"cd /",
+				"cd stress_tools",
+				cmd_line,
+			], spacing_ms=400)
 		# For file-driven updates, disable internal sampler to avoid mixed data
 		self._sample_timer.stop()
 		# Begin tailing the stress output file (use user-specified path)
@@ -1852,7 +1901,7 @@ class PerformanceApp(QtWidgets.QMainWindow):
 		
 		# Duration
 		dur = int(self.duration_spin.value())
-		parts.extend(["--duration", str(dur)])
+		parts.extend(["--duration", str(dur), "--quiet"])
 		self.command_preview.setPlainText(" ".join(parts) + " &")
 
 	def _start_tail_file(self, path: str) -> None:
